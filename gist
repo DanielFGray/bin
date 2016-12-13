@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+declare -r esc=$'\033'
+declare -r c_reset="${esc}[0m"
+declare -r c_red="${esc}[31m"
+# declare c_green="${esc}[32m"
+# declare c_blue="${esc}[34m"
+
+err() {
+  printf "${c_red}%s${c_reset}\n" "$*" >&2
+}
+
+die() {
+  # [[ -n "$1" ]] && err "$1"
+  exit 1
+}
+
+has() {
+  local verbose=false
+  if [[ $1 == '-v' ]]; then
+    verbose=true
+    shift
+  fi
+  for c in "$@"; do c="${c%% *}"
+    if ! command -v "$c" &> /dev/null; then
+      [[ "$verbose" == true ]] && err "$c not found"
+      return 1
+    fi
+  done
+}
+
+usage() {
+  LESS=-FEXR less <<'HELP'
+ix [OPTIONS]
+
+-l             list all pastes, uses fzf for interactive use
+-d [id]        delete the paste at [id]
+-i [id]        replaces the paste with stdin
+-h             print this help
+HELP
+}
+
+has -v fzf curl jq || die
+
+declare json gist url id
+declare -a preview
+
+list_pastes() {
+  printf 'fetching...\r'
+  # json=$(curl -s https://api.github.com/users/DanielFGray/gists)
+  json=$(< ~/gist.json)
+  gists=$(jq -r '.[] | "\(.html_url) \(.description)"' <<< "$json")
+
+  if has hxselect hxnormalize; then
+    preview+=( --preview='
+      g={};
+      curl -sL "${g%% *}" |
+        hxnormalize -xe |
+        hxselect ".file-box" |
+        w3m -T text/html -dump |
+        grep -v "^Raw$"'
+    )
+  fi
+
+  if has fzf; then
+    gist=$(fzf --cycle -e "${preview[@]}" <<< "$gists")
+  else
+    echo "$gists"
+    exit
+  fi
+
+  [[ -n "$gist" ]] || die
+  url="${gist%% *}"
+  id="${url##*/}"
+  printf '%s\n' "$id"
+}
+
+paste_gist() {
+  curl -d '@-' https://api.github.com/gists
+}
+
+while getopts ':hl' x; do
+  case "$x" in
+    h) usage; exit ;;
+    l) list_pastes; exit ;;
+  esac
+done

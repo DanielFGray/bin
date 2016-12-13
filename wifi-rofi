@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+declare -a headers=( SSID SIGNAL BARS SECURITY )
+declare column_headers
+declare header_fields
+
+IFS=, header_fields="${headers[*]}"
+nmcli -t --fields "${header_fields}" d wifi |
+  column -t -s':' |
+  rofi -dmenu -p '' | sed -r 's/  +\d+ .*//'

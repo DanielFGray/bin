@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+declare wm
+
+has() {
+  command -v "$1" &> /dev/null
+}
+
+picker() {
+  local known_wms=(
+    awesome
+    bspwm
+    dwm
+    i3
+    openbox-session
+    startkde
+    startxfce4
+    xmonad
+    xterm
+  )
+  local avail_wms=()
+  for wm in "${known_wms[@]}"; do
+    has "$wm" && avail_wms+=( "$wm" )
+  done
+  [[ -f '/home/dan/.wine/drive_c/Program Files (x86)/Bethesda Softworks/Oblivion/OblivionLauncher.exe' ]] && avail_wms+=( oblivion )
+  if has fzf; then
+    fzf -1 --reverse --inline-info --cycle < <(printf '%s\n' "${avail_wms[@]}")
+  else
+    PS3="choose a number between 1 and ${#avail_wms[@]}: "
+    select v in "${avail_wms[@]}"; do
+      echo "$v"
+      break
+    done
+  fi
+}
+
+wm=$(picker)
+
+case "$wm" in
+  bspwm) wm='bspwm -c ~/.config/bspwm/bspwmrc' ;;
+  oblivion) wm="xterm -e 'wine ~/.wine/drive_c/Program\ Files\ (x86)/Bethesda\ Softworks/Oblivion/OblivionLauncher.exe'"
+esac
+
+printf '%s\n' "$wm"

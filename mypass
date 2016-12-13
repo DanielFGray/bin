@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+if [[ -e "${HOME}/.bash_utils" ]]; then
+  source "${HOME}/.bash_utils"
+else
+  printf '\e[31mbash_utils not found\e[0m\n' >&2
+  exit 1
+fi
+
+has -v fzf kdbxviewer || die
+
+passlist=$(kdbxviewer -c ~/pass.kdbx)
+
+password=$(fzf --ansi <<< "$passlist")
+
+[[ -n "$password" ]] && xclip <<< "$password"
