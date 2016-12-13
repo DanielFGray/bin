@@ -1,11 +1,26 @@
 #!/usr/bin/env bash
 
-if [[ -e "${HOME}/.bash_utils" ]]; then
-  source "${HOME}/.bash_utils"
-else
-  printf '\e[31mbash_utils not found\e[0m\n' >&2
-  exit 1
-fi
+declare -r esc=$'\033'
+declare -r c_red="${esc}[31m"
+declare -r c_reset="${esc}[0m"
+
+err() {
+  printf "${c_red}%s${c_reset}\n" "$*" >&2
+}
+
+has() {
+  local verbose=false
+  if [[ $1 == '-v' ]]; then
+    verbose=true
+    shift
+  fi
+  for c in "$@"; do c="${c%% *}"
+    if ! command -v "$c" &> /dev/null; then
+      [[ "$verbose" == true ]] && err "$c not found"
+      return 1
+    fi
+  done
+}
 
 has -v fzf kdbxviewer || die
 

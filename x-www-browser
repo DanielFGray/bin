@@ -1,11 +1,36 @@
 #!/usr/bin/env bash
 
-if [[ -e "${HOME}/.bash_utils" ]]; then
-  source "${HOME}/.bash_utils"
-else
-  printf '\e[31mbash_utils not found\e[0m\n' >&2
+declare -r esc=$'\033'
+declare -r c_red="${esc}[31m"
+declare -r c_reset="${esc}[0m"
+
+err() {
+  printf "${c_red}%s${c_reset}\n" "$*" >&2
+}
+
+die() {
+  [[ -n "$1" ]] && err "$1"
   exit 1
-fi
+}
+
+select_from() {
+  local cmd='command -v'
+  for a in "$@"; do
+    case "$a" in
+      -c)
+        cmd="$2"
+        shift 2
+        ;;
+    esac
+  done
+  for c in "$@"; do
+    if $cmd "${c%% *}" &> /dev/null; then
+      echo "$c"
+      return 0
+    fi
+  done
+  return 1
+}
 
 browsers=( firefox luakit brave chromium chrome uzbl dwb qutebrowser )
 cmd=$(select_from -c 'pgrep -f' "${browsers[@]}") ||

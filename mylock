@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+declare -r esc=$'\033'
+declare -r c_red="${esc}[31m"
+declare -r c_reset="${esc}[0m"
+
 declare tmpbg suspend
 # icon="$HOME/.xlock/icon.png"
 tmpbg='/tmp/screen.png'
@@ -8,13 +12,33 @@ finish() {
   [[ -f "$tmpbg" ]] && rm "$tmpbg"
 }
 
-trap finish SIGHUP SIGINT SIGTERM
+err() {
+  printf "${c_red}%s${c_reset}\n" "$*" >&2
+}
+
+has() {
+  local verbose=false
+  if [[ $1 == '-v' ]]; then
+    verbose=true
+    shift
+  fi
+  for c in "$@"; do c="${c%% *}"
+    if ! command -v "$c" &> /dev/null; then
+      [[ "$verbose" == true ]] && err "$c not found"
+      return 1
+    fi
+  done
+}
 
 _suspend() {
   sleep 1
   xset dpms force off
   systemctl suspend
 }
+
+trap finish SIGHUP SIGINT SIGTERM
+
+has -v i3lock maim || die
 
 while :; do
   case "$1" in
