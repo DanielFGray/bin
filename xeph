@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+declare size='800x600'
+declare disp
+
+cleanup() {
+  xdo_pid=$(pgrep -f 'xdotool.*windowfocus') && kill "$xdo_pid"
+  pkill Xephyr
+  # exit
+}
+trap cleanup SIGHUP SIGINT SIGTERM SIGQUIT SIGABRT
+
+start_server() {
+  disp="$DISPLAY"
+  disp="${disp/#:}"
+  (( ++disp ))
+  (Xephyr -name "xephyr_$disp" -ac -br -noreset -screen "$size" ":$disp" &)
+  send_cmd 'xrdb -load ~/.Xresources'
+  for cmd; do
+    send_cmd "$cmd"
+  done
+  follow_focus
+  read_input
+}
+
+repl_help() {
+  LESS=-FEXR less <<'HELP'
+q     quit
+r     restart new xephyr process
+f     attempt to enable focus-follows-mouse inside xephyr [requires xdotool]
+size= change the proportion of the xephyr window, eg size=800x600
+HELP
+}
+
+read_input() {
+  read -r -e -p 'xeph> ' <> /dev/tty || { cleanup; return; }
+  [[ -n "$REPLY" ]] && case "$REPLY" in
+    h) repl_help ;;
+    q) pkill Xephyr; exit ;;
+    r) pkill Xephyr; start_server ;;
+    f) follow_focus ;;
+    size=*) size="${REPLY#*=}"; echo 'restart to take effect' ;;
+    *) [[ -n $REPLY ]] && send_cmd "$REPLY" & ;;
+  esac
+  read_input
+}
+
+follow_focus() {
+  xdo_pid=$(pgrep -f 'xdotool.*windowfocus') && kill "$xdo_pid"
+  send_cmd 'xdotool search . behave %@ mouse-enter windowfocus' &>/dev/null
+}
+
+send_cmd() {
+  DISPLAY=":$disp.0" "$SHELL" -c "$*" &
+}
+
+echo 'press h for help'
+start_server "$@"
+cleanup
