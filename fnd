@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+declare -a ignore_dirs
+declare dir='.'
+
+if [[ -e "$HOME/.ignore" ]]; then
+  while IFS= read -r d; do
+    ignore_dirs+=( -path "*/$d" -o )
+  done < "$HOME/.ignore"
+fi
+
+ignore_dirs+=( -path '*/\.*' -o )
+
+if [[ -d $1 ]]; then
+  dir="$1"
+  shift
+fi
+
+command find -L "$dir" -mindepth 1 \
+  \( "${ignore_dirs[@]}" \
+    -fstype 'devfs' \
+    -o -fstype 'devtmpfs' \
+    -o -fstype 'proc' \
+  \) -prune -o "$@" -print | sed 's|^\./||'

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+get_volume() {
+  amixer get Master 2>&1 | awk '/Mono/{gsub(/[\[\]]/, "", $4); printf $4}'
+}
+
+set_volume() {
+  amixer -q sset Master "$1"
+}
+
+old_volume=$(get_volume)
+set_volume '100%'
+xterm -geometry 50x6 -display :0 -e 'mpv /home/dan/downloads/alarm.mp3 --loop=inf'
+set_volume "$old_volume"
