@@ -75,7 +75,7 @@ select_pane() {
       tmux select-pane   -t "$pane"
       tmux select-window -t "$pane"
     fi
-  fi &
+  fi
 }
 
 start_server() {
@@ -84,7 +84,7 @@ start_server() {
       tmux rename-window -t "$TMUX_PANE" 'vim'
       if ! tmux list-sessions -F '#S' | grep -qF 'cmd'; then
         if [[ -e "$HOME/.tmux.alt.conf" ]]; then
-          tmux_opts='source-file $HOME/.tmux.alt.conf'
+          tmux_opts='source-file "$HOME/.tmux.alt.conf"'
         else
           tmux_opts="set prefix C-s \; bind s send-prefix \; bind C-s last-window \; unbind C-a \; set status-position top \; set status-justify centre \; set status-right '' \; set status-left ''"
         fi
@@ -92,9 +92,9 @@ start_server() {
       fi
     fi &
     if has nvim nvr; then
-      NVIM_LISTEN_ADDRESS=/tmp/nvimsocket nvim "$@"
+      NVIM_LISTEN_ADDRESS=/tmp/nvimsocket exec nvim "$@"
     else
-      vim --servername 'VIMSERVER'  "$@"
+      exec vim --servername 'VIMSERVER'  "$@"
     fi
   else
     has gvim || die 'cannot start new vim server'
@@ -147,14 +147,14 @@ if [[ -n "$serv" ]]; then
       shift
     done
   fi
-  select_pane "$serv"
+  select_pane "$serv" &
   for f in "${files[@]}"; do
     if [[ -d "$f" ]]; then
-      f=$(ag -lk)
+      f=$(ag -l "$f")
     fi
     vim "${vimopts[@]}" --remote "$f"
     sleep 0.2
-  done
+  done &
 else
   start_server "$@"
 fi

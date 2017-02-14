@@ -1,49 +1,71 @@
 #!/usr/bin/env bash
 
-declare passlist
-declare password
+shopt -s nullglob globstar
 
-declare -r esc=$'\033'
-declare -r c_red="${esc}[31m"
-declare -r c_reset="${esc}[0m"
+typeit=0
+if [[ $1 == "--type" ]]; then
+	typeit=1
+	shift
+fi
 
-err() {
-  printf "${c_red}%s${c_reset}\n" "$*" >&2
-}
+prefix=${PASSWORD_STORE_DIR-~/.password-store}
+password_files=( "$prefix"/**/*.gpg )
+password_files=( "${password_files[@]#"$prefix"/}" )
+password_files=( "${password_files[@]%.gpg}" )
 
-die() {
-  (( $# > 0 )) && err "$*"
-  exit 1
-}
+password=$(printf '%s\n' "${password_files[@]}" | dmenu -b -z -fn 'Fantasque Sans Mono-8' -nb '#131313' "$@")
 
-has() {
-  local verbose
-  if [[ $1 == '-v' ]]; then
-    verbose=1
-    shift
-  fi
-  for c in "$@"; do c="${c%% *}"
-    if ! command -v "$c" &> /dev/null; then
-      (( verbose > 0 )) && err "$c not found"
-      return 1
-    fi
-  done
-}
+[[ -n $password ]] || exit
 
-has -v fzf kdbxviewer || die
+if [[ $typeit -eq 0 ]]; then
+	pass show -c "$password" 2>/dev/null
+else
+	pass show "$password" | { read -r pass; printf %s "$pass"; } |
+		xdotool type --clearmodifiers --file -
+fi
 
-OPTERR=0
-while getopts 'i' opt; do
-  case "$opt" in
-    i) kdbxviewer -i ~/pass.kdbx; exit ;;
-  esac
-done
-shift $(( OPTIND - 1 ))
-unset opt OPTARG OPTIND
+# declare passlist
+# declare password
 
-passlist=$(kdbxviewer -c ~/pass.kdbx) &&
-  password=$(fzf --inline-info --cycle --ansi <<< "$passlist")
-[[ -n "$password" ]] || exit 1
-password="${password/Generated Password for }"
-read -r password <<< "${password#* }"
-xclip -r <<< "$password"
+# declare -r esc=$'\033'
+# declare -r c_red="${esc}[31m"
+# declare -r c_reset="${esc}[0m"
+
+# err() {
+#   printf "${c_red}%s${c_reset}\n" "$*" >&2
+# }
+
+# die() {
+#   (( $# > 0 )) && err "$*"
+#   exit 1
+# }
+
+# has() {
+#   local verbose
+#   if [[ $1 == '-v' ]]; then
+#     verbose=1
+#     shift
+#   fi
+#   for c in "$@"; do c="${c%% *}"
+#     if ! command -v "$c" &> /dev/null; then
+#       (( verbose > 0 )) && err "$c not found"
+#       return 1
+#     fi
+#   done
+# }
+
+# OPTERR=0
+# while getopts 'i' opt; do
+#   case "$opt" in
+#     i) kdbxviewer -i ~/pass.kdbx; exit ;;
+#   esac
+# done
+# shift $(( OPTIND - 1 ))
+# unset opt OPTARG OPTIND
+
+# passlist=$(kdbxviewer -c ~/pass.kdbx) &&
+#   password=$(fzf --inline-info --cycle --ansi <<< "$passlist")
+# [[ -n "$password" ]] || exit 1
+# password="${password/Generated Password for }"
+# read -r password <<< "${password#* }"
+# xclip -r <<< "$password"

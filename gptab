@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 
+open_tabs() {
+  for f; do
+    (/opt/GuitarPro6/launcher.sh "$f" &) &> /dev/null
+  done
+}
+export -f open_tabs
+
 mapfile -t files < <(
   fnd ~/Guitar\ Pro\ Tabs -type f |
-  fzf -e --reverse
+  fzf -e -m --reverse --height='99%' --query="$*" \
+    --bind='enter:execute:bash -c "open_tabs {}"'
 )
-
-for f in "${files[@]}"; do
-  (/opt/GuitarPro6/launcher.sh "$f" &) &> /dev/null
-done

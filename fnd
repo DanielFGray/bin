@@ -9,7 +9,10 @@ if [[ -e "$HOME/.ignore" ]]; then
   done < "$HOME/.ignore"
 fi
 
-ignore_dirs+=( -path '*/\.*' -o )
+if [[ $1 = '-no-hidden' ]]; then
+  shift
+  ignore_dirs+=( -path '*/\.*' -o )
+fi
 
 if [[ -d $1 ]]; then
   dir="$1"

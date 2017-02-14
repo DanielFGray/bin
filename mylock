@@ -52,6 +52,8 @@ done
 maim --format png /dev/stdout |
   convert - -scale 20% -scale 500% "$tmpbg"
 
+xset dpms force off
+
 i3lock -i "$tmpbg"
 
 [[ -n "$suspend" ]] && _suspend

@@ -4,13 +4,23 @@ in_term() {
   [[ -t 0 || -p /dev/stdin ]]
 }
 
-declare -a cmds
+has() {
+  command -v "$1" &> /dev/null
+}
 
-if tmux ls &> /dev/null; then
-  cmds=( tmux attach )
+declare -a cmds
+declare -a sessions
+declare session
+
+mapfile -t sessions < <(tmux ls -F '#S')
+
+if (( ${#sessions[@]} > 0 )); then
+  IFS='|' session="${sessions[*]}"
+  session="${session##*|}"
+  cmds=( tmux attach -t "$session" )
 else
-  if has tmuxinator; then
-    cmds=( tmuxinator start main )
+  if has tmuxp; then
+    cmds=( tmuxp load main )
   else
     cmds=( tmux )
   fi
@@ -20,5 +30,5 @@ xrdb -load ~/.Xresources
 if in_term; then
   exec "${cmds[@]}"
 else
-  exec x-terminal-emulator -e ${cmds[*]}
+  exec x-terminal-emulator -e "${cmds[@]}"
 fi

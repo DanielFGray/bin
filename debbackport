@@ -11,7 +11,7 @@ declare version
 declare -a versions
 declare builddir='/tmp/backport-build/'
 
-if [[ -z $pkg ]]; then
+if [[ -z "$pkg" ]]; then
   printf 'nothing to search for\n'
   exit 1
 fi
@@ -19,7 +19,7 @@ fi
 set -e
 
 mapfile -t versions < <(apt-cache showsrc "$pkg" | awk '/^Version/{ print $2 }' | sort -uh)
-printf '%s has the following versions available:' "$pkg"
+printf '%s has the following versions available:\n' "$pkg"
 PS3="choose a number between 1 and ${#versions[@]}: "
 select v in "${versions[@]}"; do
   version="$v";
@@ -36,8 +36,8 @@ apt-get source "${pkg}=${version}"
 
 cd "${pkg}-${version%-*}"
 
-[[ -e debian/rules ]] && ask 'edit debian/rules?' && vim debian/rules
+[[ -e debian/rules ]] && ask 'edit debian/rules?' && $EDITOR debian/rules
 
 dpkg-buildpackage -uc -us -tc
 
-sudo dpkg -i ../"${pkg}"_"${version%-*}"-*.deb
+sudo dpkg -i ../"${pkg}_${version%-*}"-*.deb

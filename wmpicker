@@ -10,6 +10,7 @@ picker() {
   local known_wms=(
     awesome
     bspwm
+    cinnamon-session
     dwm
     i3
     openbox-session
