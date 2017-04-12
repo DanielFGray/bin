@@ -21,7 +21,7 @@ unitConversion() {
 
 getSpaceAvailable() {
   local used _
-  if has quota && quota &> /dev/null; then
+  if has quota && quota &> /dev/null && [[ -n $(quota) ]]; then
     read -r _ used total _ < <(quota -w | tail -n1)
   else
     read -r used total < <(df --total --output=used,size | tail -n1)

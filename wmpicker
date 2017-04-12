@@ -1,45 +1,44 @@
 #!/usr/bin/env bash
 
-declare wm
+declare -A known_wms
+declare -a avail_wms
+
+known_wms=(
+  [awesome]='awesome'
+  [bspwm]="bspwm -c $HOME/.config/bspwm/bspwmrc"
+  [cinnamon]='cinnamon-session'
+  [dwm]='dwm'
+  [i3]='i3'
+  [openbox]='openbox-session'
+  [kde]='startkde'
+  [xfce]='startxfce4'
+  [xmonad]='xmonad'
+  [xterm]='xterm'
+)
 
 has() {
   command -v "$1" &> /dev/null
 }
 
-picker() {
-  local known_wms=(
-    awesome
-    bspwm
-    cinnamon-session
-    dwm
-    i3
-    openbox-session
-    startkde
-    startxfce4
-    xmonad
-    xterm
-  )
-  local avail_wms=()
-  for wm in "${known_wms[@]}"; do
-    has "$wm" && avail_wms+=( "$wm" )
+pick() {
+  local w wm
+  for w in "${!known_wms[@]}"; do
+    wm="${known_wms[$w]}"
+    has "${wm%% *}" && avail_wms+=( "$w" )
   done
-  [[ -f '/home/dan/.wine/drive_c/Program Files (x86)/Bethesda Softworks/Oblivion/OblivionLauncher.exe' ]] && avail_wms+=( oblivion )
+
   if has fzf; then
-    fzf -1 --reverse --inline-info --cycle < <(printf '%s\n' "${avail_wms[@]}")
+    wm=$(printf '%s\n' "${avail_wms[@]}" | fzf -1 --reverse --inline-info --cycle)
   else
     PS3="choose a number between 1 and ${#avail_wms[@]}: "
     select v in "${avail_wms[@]}"; do
-      echo "$v"
+      wm="$v"
       break
     done
   fi
+
+  [[ -n $wm ]] || return 1
+  echo "${known_wms[$wm]}"
 }
 
-wm=$(picker)
-
-case "$wm" in
-  bspwm) wm='bspwm -c ~/.config/bspwm/bspwmrc' ;;
-  oblivion) wm="xterm -e 'wine ~/.wine/drive_c/Program\ Files\ (x86)/Bethesda\ Softworks/Oblivion/OblivionLauncher.exe'"
-esac
-
-printf '%s\n' "$wm"
+pick
