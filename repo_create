@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+
+declare name
+
+declare -A colors
+colors[red]=$(tput setaf 1)
+colors[green]=$(tput setaf 2)
+colors[blue]=$(tput setaf 4)
+colors[reset]=$(tput sgr0)
+
+color() {
+  local c
+  c="$1"
+  shift
+  printf '%s' "${colors[$c]}"
+  printf '%s\n' "$@"
+  printf '%s' "${colors[reset]}"
+}
+
+err() {
+  color red "$@" >&2
+}
+
+die() {
+  [[ -n "$1" ]] && err "$@"
+  exit 1
+}
+
+has() {
+  local verbose
+  if [[ $1 = '-v' ]]; then
+    verbose=1
+    shift
+  fi
+  for c; do c="${c%% *}"
+    if ! command -v "$c" &> /dev/null; then
+      (( verbose > 0 )) && err "$c not found"
+      return 1
+    fi
+  done
+}
+
+ask() {
+  read -r -n1 -p "$* " ans
+  printf '\n'
+  [[ ${ans^} = Y* ]]
+}
+
+repo_init_github() {
+  # https://developer.github.com/v3/repos/#create
+  if res=$(api github post user/repos --json ".name=\"$1\""); then
+    [[ -n $(jq -r '.errors' <<< "$res") ]] &&
+      die "$(jq -r '.errors[0].message' <<< "$res")"
+    if [[ -d '.git' ]] && ask 'push current repo?'; then
+      git remote add origin "$(jq -r '.ssh_url' <<< "$res")"
+      git push -u origin master
+    fi
+    jq -r '.html_url' <<< "$res"
+  else
+    jq <<< "$res"
+  fi
+}
+
+repo_init_gitlab() {
+  if res=$(api gitlab post projects -d "name=$1"); then
+    [[ -n $(jq -r '.message' <<< "$res") ]] &&
+      die "$(jq '.message' <<< "$res")"
+    if [[ -d '.git' ]] && ask 'push current repo?'; then
+      git remote add origin "$(jq -r '.ssh_url_to_repo' <<< "$res")"
+      git push -u origin master
+    fi
+    jq -r '.http_url_to_repo' <<< "$res"
+  else
+    jq <<< "$res"
+  fi
+}
+
+has -v api jq || die
+
+service="$1"
+shift
+
+has "repo_init_$service" || {
+  mapfile -t configs_avail < <(compgen -A function | perl -lne 'print $1 if /repo_init_(.*)/')
+  die "can't create repo at $service" "the folowing are allowed:  ${configs_avail[*]}"
+}
+
+name="${1// }"
+if [[ -z $name ]]; then
+  dir="${PWD##*/}"
+  read -r -e -p 'name: ' -i "${dir// }" name
+  [[ -z $name ]] && die
+  name="${name// }"
+fi
+
+"repo_init_$service" "$name"
