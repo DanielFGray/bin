@@ -1,14 +1,44 @@
 #!/usr/bin/env bash
 
+declare loud=0
+declare urgent
+
+bground() {
+  ("$@" &> /dev/null &)
+}
+
 get_volume() {
-  amixer get Master 2>&1 | awk '/Mono/{gsub(/[\[\]]/, "", $4); printf $4}'
+  amixer get Master 2>&1 | awk '/Front Left:/{gsub(/[\[\]]/, "", $5); printf $5}'
 }
 
 set_volume() {
   amixer -q sset Master "$1"
 }
 
-old_volume=$(get_volume)
-set_volume '100%'
-xterm -geometry 50x6 -display :0 -e 'mpv /home/dan/downloads/alarm.mp3 --loop=inf'
-set_volume "$old_volume"
+sounds() {
+  if (( loud > 0)); then
+    old_volume=$(get_volume)
+    set_volume '100%'
+  fi
+  xterm -class dialog -geometry 50x10 -display :0 -e "mpv '$sound' ${urgent:+--loop=inf}"
+  (( loud > 0 )) && set_volume "$old_volume"
+}
+
+# http://soundbible.com/1599-Store-Door-Chime.html
+sound=~/Downloads/Store_Door_Chime-Mike_Koenig-570742973.mp3
+
+OPTERR=0
+while getopts 'uL' opt; do
+  case "$opt" in
+    u) # http://soundbible.com/2061-Loud-Alarm-Clock-Buzzer.html
+      sound=~/Downloads/Loud_Alarm_Clock_Buzzer-Muk1984-493547174.mp3
+      urgent=1 ;;
+    L) loud=1 ;;
+  esac
+  shift
+done
+shift $(( OPTIND - 1 ))
+unset opt OPTARG OPTIND
+
+(( $# > 0 )) && notify-send ${urgent:+-u critical} "$@"
+sounds
