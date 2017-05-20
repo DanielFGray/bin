@@ -9,6 +9,7 @@ known_wms=(
   [cinnamon]='cinnamon-session'
   [dwm]='dwm'
   [i3]='i3'
+  [lxqt]='dbus-launch lxqt-session'
   [openbox]='openbox-session'
   [kde]='startkde'
   [xfce]='startxfce4'
@@ -28,7 +29,7 @@ pick() {
   done
 
   if has fzf; then
-    wm=$(printf '%s\n' "${avail_wms[@]}" | fzf -1 --reverse --inline-info --cycle)
+    wm=$(printf '%s\n' "${avail_wms[@]}" | fzf -1 --reverse --inline-info --cycle --margin=40%)
   else
     PS3="choose a number between 1 and ${#avail_wms[@]}: "
     select v in "${avail_wms[@]}"; do

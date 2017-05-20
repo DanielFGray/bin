@@ -63,7 +63,7 @@ repo_init_github() {
 
 repo_init_gitlab() {
   if res=$(api gitlab post projects -d "name=$1"); then
-    [[ -n $(jq -r '.message' <<< "$res") ]] &&
+    [[ "$(jq -r '.message' <<< "$res")" != 'null' ]] &&
       die "$(jq '.message' <<< "$res")"
     if [[ -d '.git' ]] && ask 'push current repo?'; then
       git remote add origin "$(jq -r '.ssh_url_to_repo' <<< "$res")"

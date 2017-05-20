@@ -88,7 +88,7 @@ start_server() {
         else
           tmux_opts="set prefix C-s \; bind s send-prefix \; bind C-s last-window \; unbind C-a \; set status-position top \; set status-justify centre \; set status-right '' \; set status-left ''"
         fi
-        tmux split-window -t "$TMUX_PANE" -d -v -p 25 "TMUX="" tmux new-session -s \"cmd\" \; $tmux_opts"
+        tmux split-window -t "$TMUX_PANE" -d -h "TMUX="" tmux new-session -s \"cmd\" \; $tmux_opts"
       fi
     fi &
     if has nvim nvr; then

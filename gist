@@ -46,10 +46,11 @@ declare json gist url id
 declare -a preview
 
 list_pastes() {
-  printf 'fetching...\r'
-  # json=$(curl -s https://api.github.com/users/DanielFGray/gists)
-  json=$(< ~/gist.json)
-  gists=$(jq -r '.[] | "\(.html_url) \(.description)"' <<< "$json")
+  printf 'fetching user info...\r'
+  user=$(api github get user | jq -r '.gists_url')
+  user="${user%\{*}"
+  user="${user/#*.com}"
+  gists=$(api github get "$user" | jq -r '.[] | "\(.html_url) \(.description)"')
 
   if has hxselect hxnormalize; then
     preview+=( --preview='

@@ -49,7 +49,7 @@ while :; do
   esac
 done
 
-maim --format png /dev/stdout |
+maim -u --format=png |
   convert - -scale 20% -scale 500% "$tmpbg"
 
 xset dpms force off

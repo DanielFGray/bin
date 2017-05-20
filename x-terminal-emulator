@@ -32,6 +32,6 @@ select_from() {
   return 1
 }
 
-favs=( urxvtcd urxvtc urxvt termite xterm )
+favs=( urxvtcd urxvtc urxvt termite lxterminal xterm )
 cmd=$(select_from "${favs[@]}") || die "no term in ( ${favs[*]} )"
 (exec $cmd "$@" &)
