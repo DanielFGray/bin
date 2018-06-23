@@ -130,7 +130,7 @@ if [[ -n "$serv" ]]; then
   if (( $# == 0 )); then
     has fv || die 'enter a file name'
     if in_term; then
-      FZF_DEFAULT_OPTS='--reverse --height=25 --preview="highlight -q --force -O ansi {}"' fv -c "v ${noselect:+-d}"
+      fv -c "v ${noselect:+-d}"
       exit 0
     else
       x-terminal-emulator -e fv -c v
