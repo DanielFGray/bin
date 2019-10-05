@@ -39,7 +39,7 @@ user="$1"
 shift
 
 if ! id "$user" &> /dev/null; then
-  if [[ -n $ephmeral ]]; then
+  if [[ -n $ephemeral ]]; then
     die "$user already exists and cannot be ephemeral"
   fi
   printf "%screating user %s%s\n" "${colors[green]}" "${colors[reset]}" "$user"
