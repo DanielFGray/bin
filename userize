@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+declare user
+declare ephemeral
+declare -A colors
+colors[red]=$(tput setaf 1)
+colors[green]=$(tput setaf 2)
+colors[blue]=$(tput setaf 4)
+colors[reset]=$(tput sgr0)
+
+color() {
+  local c
+  c="$1"
+  shift
+  printf '%s' "${colors[$c]}"
+  printf '%s\n' "$@"
+  printf '%s' "${colors[reset]}"
+}
+
+err() {
+  color red "$@" >&2
+}
+
+die() {
+  [[ -n "$1" ]] && err "$@"
+  exit 1
+}
+
+if [[ $1 = -e ]]; then
+  ephemeral=1
+  shift
+fi
+
+if (( $# < 2 )); then
+  die 'not enough arguments, need a user and a command'
+fi
+
+user="$1"
+shift
+
+if ! id "$user" &> /dev/null; then
+  printf "%screating user %s%s\n" "${colors[green]}" "${colors[reset]}" "$user"
+  sudo useradd -m "$user" || die
+fi
+
+sudo -iu "$user" "$@"
+
+if [[ -n $ephemeral ]]; then
+  printf "%sdeleting user %s%s\n" "${colors[green]}" "${colors[reset]}" "$user"
+  sudo userdel "$user"
+  sudo rm -rf "/home/$user"
+fi
