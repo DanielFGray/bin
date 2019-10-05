@@ -39,17 +39,15 @@ user="$1"
 shift
 
 if ! id "$user" &> /dev/null; then
-  if [[ -n $ephemeral ]]; then
-    die "$user already exists and cannot be ephemeral"
-  fi
-  printf "%screating user %s%s\n" "${colors[green]}" "${colors[reset]}" "$user"
+  printf '%screating user %s%s\n' "${colors[green]}" "${colors[reset]}" "$user"
   sudo useradd -m "$user" || die
+elif [[ -n $ephemeral ]]; then
+  die "$user already exists and cannot be ephemeral"
 fi
 
 sudo -iu "$user" "$@"
 
 if [[ -n $ephemeral ]]; then
-  printf "%sdeleting user %s%s\n" "${colors[green]}" "${colors[reset]}" "$user"
-  sudo userdel "$user"
-  sudo rm -rf "/home/$user"
+  printf '%sdeleting user %s%s\n' "${colors[green]}" "${colors[reset]}" "$user"
+  sudo userdel -r "$user"
 fi
