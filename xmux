@@ -20,7 +20,7 @@ if (( ${#sessions[@]} > 0 )); then
   cmds=( tmux attach -t "$session" )
 else
   if has tmuxp; then
-    cmds=( tmuxp load main )
+    cmds=( tmuxp load main '||' tmux )
   else
     cmds=( tmux )
   fi

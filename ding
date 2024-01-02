@@ -3,7 +3,7 @@
 declare quiet
 
 bground() {
-	("$@" &> /dev/null &)
+  ("$@" &> /dev/null &)
 }
 
 while getopts ':q' x; do
@@ -14,13 +14,13 @@ done
 shift $(( OPTIND - 1 ))
 
 if [[ -n $quiet  ]] && pgrep -x Xorg &> /dev/null; then
-	bground mpv ~/Downloads/Store_Door_Chime-Mike_Koenig-570742973.mp3
-	(( $# > 0 )) && notify-send "$@"
+  bground mpv ~/Downloads/Store_Door_Chime-Mike_Koenig-570742973.mp3
+  (( $# > 0 )) && notify-send -u critical "$@"
 else
-	if [[ -n $TMUX ]]; then
-		m='ding'
-		(( $# > 0 )) && m="$*"
-		tmux display "$m"
-	fi
-	tput bel
+  if [[ -n $TMUX ]]; then
+    m='ding'
+    (( $# > 0 )) && m="$*"
+    tmux display "$m" // FIXME: longer display time
+  fi
+  tput bel
 fi

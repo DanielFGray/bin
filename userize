@@ -8,17 +8,12 @@ colors[green]=$(tput setaf 2)
 colors[blue]=$(tput setaf 4)
 colors[reset]=$(tput sgr0)
 
-color() {
-  local c
-  c="$1"
-  shift
-  printf '%s' "${colors[$c]}"
-  printf '%s\n' "$@"
-  printf '%s' "${colors[reset]}"
+err() {
+  printf '%s%s%s\n' "${colors[red]}" "$*" "${colors[reset]}" >&2
 }
 
-err() {
-  color red "$@" >&2
+log() {
+  printf '%s%s%s\n' "${colors[green]}" "$*" "${colors[reset]}"
 }
 
 die() {
@@ -39,7 +34,7 @@ user="$1"
 shift
 
 if ! id "$user" &> /dev/null; then
-  printf '%screating user %s%s\n' "${colors[green]}" "${colors[reset]}" "$user"
+  log "creating user $user"
   sudo useradd -m "$user" || die
 elif [[ -n $ephemeral ]]; then
   die "$user already exists and cannot be ephemeral"
@@ -48,6 +43,7 @@ fi
 sudo -iu "$user" "$@"
 
 if [[ -n $ephemeral ]]; then
-  printf '%sdeleting user %s%s\n' "${colors[green]}" "${colors[reset]}" "$user"
-  sudo userdel -r "$user"
+  log "deleting user $user"
+  sudo userdel -fr "$user"
 fi
+

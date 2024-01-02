@@ -2,70 +2,60 @@
 
 shopt -s nullglob globstar
 
-typeit=0
-if [[ $1 == "--type" ]]; then
-	typeit=1
-	shift
-fi
+in_term() {
+  [[ -t 0 || -p /dev/stdin ]]
+}
 
-prefix=${PASSWORD_STORE_DIR-~/.password-store}
-password_files=( "$prefix"/**/*.gpg )
-password_files=( "${password_files[@]#"$prefix"/}" )
-password_files=( "${password_files[@]%.gpg}" )
+select_from () {
+  local a c cmd
+  cmd='command -v'
+  for a; do
+    case "$a" in
+      -c) cmd="$2"; 2 ;;
+      *) [[ $a = -* ]] && break 2 ;;
+    esac
+    shift
+  done
+  for c in "$@"; do
+    if $cmd "${c%% *}" &> /dev/null; then
+      echo "$c"
+      return 0
+    fi
+  done
+  return 1
+}
 
-password=$(printf '%s\n' "${password_files[@]}" | dmenu -b -z -fn 'Fantasque Sans Mono-8' -nb '#131313' "$@")
+declare generate
 
-[[ -n $password ]] || exit
+  for a; do
+    case "$a" in
+      -g|--generate) generate=1 ;;
+      *) [[ $a = -* ]] && break 2 ;;
+    esac
+    shift
+  done
 
-if [[ $typeit -eq 0 ]]; then
-	pass show -c "$password" 2>/dev/null
-else
-	pass show "$password" | { read -r pass; printf %s "$pass"; } |
-		xdotool type --clearmodifiers --file -
-fi
+typeit() {
+  prefix=${PASSWORD_STORE_DIR-~/.password-store}
+  password_files=( "$prefix"/**/*.gpg )
+  password_files=( "${password_files[@]#"$prefix"/}" )
+  password_files=( "${password_files[@]%.gpg}" )
+  if in_term; then
+    password=$(printf '%s\n' "${password_files[@]}" | fzf --inline-info --cycle --ansi)
+  else
+    password=$(printf '%s\n' "${password_files[@]}" | dmenu -fn "$DMENU_FONT" -z)
+  fi
 
-# declare passlist
-# declare password
+  [[ -z $password ]] && exit
 
-# declare -r esc=$'\033'
-# declare -r c_red="${esc}[31m"
-# declare -r c_reset="${esc}[0m"
+  picker=$(select_from 'slop' 'xprop')
 
-# err() {
-#   printf "${c_red}%s${c_reset}\n" "$*" >&2
-# }
+  if in_term && [[ -n $picker ]]; then
+    $picker &> /dev/null
+  fi
 
-# die() {
-#   (( $# > 0 )) && err "$*"
-#   exit 1
-# }
+  read -r pass < <(pass show "$password")
+  printf '%s' "$pass" | xdotool type --clearmodifiers --file -
+}
 
-# has() {
-#   local verbose
-#   if [[ $1 == '-v' ]]; then
-#     verbose=1
-#     shift
-#   fi
-#   for c in "$@"; do c="${c%% *}"
-#     if ! command -v "$c" &> /dev/null; then
-#       (( verbose > 0 )) && err "$c not found"
-#       return 1
-#     fi
-#   done
-# }
-
-# OPTERR=0
-# while getopts 'i' opt; do
-#   case "$opt" in
-#     i) kdbxviewer -i ~/pass.kdbx; exit ;;
-#   esac
-# done
-# shift $(( OPTIND - 1 ))
-# unset opt OPTARG OPTIND
-
-# passlist=$(kdbxviewer -c ~/pass.kdbx) &&
-#   password=$(fzf --inline-info --cycle --ansi <<< "$passlist")
-# [[ -n "$password" ]] || exit 1
-# password="${password/Generated Password for }"
-# read -r password <<< "${password#* }"
-# xclip -r <<< "$password"
+typeit

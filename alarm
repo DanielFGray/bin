@@ -3,42 +3,64 @@
 declare loud=0
 declare urgent
 
+declare old_volume
+declare old_volume
+
+cleanup() {
+  set_volume "$old_volume"
+}
+trap cleanup exit SIGHUP SIGINT SIGTERM SIGQUIT SIGABRT
+
 bground() {
   ("$@" &> /dev/null &)
 }
 
 get_volume() {
-  amixer get Master 2>&1 | awk '/Front Left:/{gsub(/[\[\]]/, "", $5); printf $5}'
+  pactl list sinks | awk '/Volume:/{print $5; exit}'
 }
 
 set_volume() {
-  amixer -q sset Master "$1"
+  pactl set-sink-volume 0 "$1"
 }
+export -f set_volume
 
 sounds() {
-  if (( loud > 0)); then
-    old_volume=$(get_volume)
-    set_volume '100%'
+  local xt ll
+  if (( loud )); then
+    set_volume '110%'
+  else
+    set_volume '50%'
   fi
-  xterm -class dialog -geometry 50x10 -display :0 -e "mpv '$sound' ${urgent:+--loop=inf}"
-  (( loud > 0 )) && set_volume "$old_volume"
+  xterm -name dialog -class dialog -geometry 220x60 -display :0 -e "figlet -t '$1' && mpv ${urgent:+--loop=inf} '$sound' ${urgent:+--loop=inf}" &
+  xt=$!
+  if (( urgent )); then
+    while :; do
+      sleep 10
+      set_volume '+2%'
+      pactl set-sink-mute 0 false
+    done &
+    ll=$!
+    wait -f $xt
+    kill $ll
+  fi
 }
 
-# http://soundbible.com/1599-Store-Door-Chime.html
-sound=~/Downloads/Store_Door_Chime-Mike_Koenig-570742973.mp3
+old_volume=$(get_volume)
+sound=~/Downloads/Store_Door_Chime-Mike_Koenig-570742973.mp3 # http://soundbible.com/1599-Store-Door-Chime.html
 
 OPTERR=0
-while getopts 'uL' opt; do
+while getopts ':utL' opt; do
   case "$opt" in
-    u) # http://soundbible.com/2061-Loud-Alarm-Clock-Buzzer.html
-      sound=~/Downloads/Loud_Alarm_Clock_Buzzer-Muk1984-493547174.mp3
+    u) sound=~/'Downloads/Sunday\ Church\ Ambiance-SoundBible.com-974744686.wav' # http://soundbible.com/1264-Sunday-Church-Ambiance.html
       urgent=1 ;;
     L) loud=1 ;;
+    t) sound=~/'Downloads/Loud_Alarm_Clock_Buzzer-Muk1984-493547174.mp3' # http://soundbible.com/2061-Loud-Alarm-Clock-Buzzer.html
+      urgent=1 ;;
+    *) break ;;
   esac
-  shift
 done
 shift $(( OPTIND - 1 ))
 unset opt OPTARG OPTIND
 
 (( $# > 0 )) && notify-send ${urgent:+-u critical} "$@"
-sounds
+sounds "$2"

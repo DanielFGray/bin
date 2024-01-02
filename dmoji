@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# dmoji - emoji picker using rofi
+# https://github.com/github/gemoji/blob/master/db/emoji.json
+
+jq -r '.[] | "\(.emoji) \(.description), \((.aliases + .tags | unique) | join(", "))"' < ~/.local/share/emojilib.json |
+  rofi -dmenu -multi-select |
+  awk '{printf $1}' |
+  xdotool type --clearmodifiers --file -

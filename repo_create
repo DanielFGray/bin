@@ -48,12 +48,14 @@ ask() {
 
 repo_init_github() {
   # https://developer.github.com/v3/repos/#create
+  # if res=$(curl https://api.github.com/user/repos -H "Authorization: token $GITHUB_API_TOKEN" --json "{\"name\":\"$1\"}"); then
   if res=$(api github post user/repos --json ".name=\"$1\""); then
-    [[ -n $(jq -r '.errors' <<< "$res") ]] &&
+    if [[ $(jq -r '.errors' <<< "$res") != null ]]; then
       die "$(jq -r '.errors[0].message' <<< "$res")"
+    fi
     if [[ -d '.git' ]] && ask 'push current repo?'; then
       git remote add origin "$(jq -r '.ssh_url' <<< "$res")"
-      git push -u origin master
+      git push -u origin "$(git branch --show-current)"
     fi
     jq -r '.html_url' <<< "$res"
   else
@@ -67,7 +69,7 @@ repo_init_gitlab() {
       die "$(jq '.message' <<< "$res")"
     if [[ -d '.git' ]] && ask 'push current repo?'; then
       git remote add origin "$(jq -r '.ssh_url_to_repo' <<< "$res")"
-      git push -u origin master
+      git push -u origin "$(git branch --show-current)"
     fi
     jq -r '.http_url_to_repo' <<< "$res"
   else

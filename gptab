@@ -8,7 +8,7 @@ open_tabs() {
 export -f open_tabs
 
 mapfile -t files < <(
-  fnd ~/Guitar\ Pro\ Tabs -type f |
+find ~/Guitar\ Pro\ Tabs -type f |
   fzf -e -m --reverse --height='99%' --query="$*" \
     --bind='enter:execute:bash -c "open_tabs {}"'
 )

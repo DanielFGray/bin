@@ -8,6 +8,9 @@ declare maxlength=0
 declare words=0
 declare chars=0
 declare charrange='[a-zA-Z0-9]'
+declare clipboard
+declare passentry
+declare silent
 
 err() {
   printf "${c_red}%s${c_reset}\n" "$*" >&2
@@ -19,26 +22,29 @@ die() {
 }
 
 has() {
-  local verbose=false
+  local verbose
   if [[ $1 == '-v' ]]; then
-    verbose=true
+    verbose=1
     shift
   fi
-  for c in "$@"; do c="${c%% *}"
+  for c; do c="${c%% *}"
     if ! command -v "$c" &> /dev/null; then
-      [[ "$verbose" == true ]] && err "$c not found"
+      [[ -n $verbose ]] && err "$c not found"
       return 1
     fi
   done
 }
 
 OPTERR=0
-while getopts "w:c:m:r:" opt; do
+while getopts "sw:c:m:r:I:C" opt; do
   case "$opt" in
-    w) words=$(printf '%d' "$OPTARG") ;;
-    c) chars=$(printf '%d' "$OPTARG") ;;
-    m) maxlength=$(printf '%d' "$OPTARG") ;;
-    r) charrange=$(printf '%s' "$OPTARG") ;;
+    c) chars="$OPTARG" ;;
+    m) maxlength="$OPTARG" ;;
+    r) charrange="$OPTARG" ;;
+    w) printf -v words '%d' "$OPTARG" ;;
+    C) clipboard="$OPTARG" ;;
+    I) passentry="$OPTARG" ;;
+    *) continue ;;
   esac
 done
 shift "$((OPTIND-1))"
@@ -53,8 +59,17 @@ words() {
   else
     str=$(shuf /usr/share/cracklib/cracklib-small | head -n "$1")
   fi
-  str=$(sed -r "s/'(\w)\b/\1/g; s/\b(.)/\u\1/g; s/ //g" <<< "$str")
-  printf '%s\n' "$str"
+  str=$(sed -r "s/'(\w)\b/\1/g; s/\b(.)/\u\1/g; s/ //g" <<< "$str" | tr -d '\n')
+  if [[ -n $passentry ]]; then
+    has -v pass || die
+    pass insert "$passentry" <<< "$str"
+  fi
+  if [[ -n "$clipboard" ]]; then
+    prg=$(select_from 'xclip -r ' 'xsel -b')
+    [[ -z "$prg" ]] && err 'xclip or xsel required for writing to clipboard'
+    $prg <<< "$str"
+  fi
+  (( silent )) || printf '%s\n' "$str"
 }
 
 chars() {

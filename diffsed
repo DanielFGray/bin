@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+declare sexpr
+declare file
+declare sedopts=()
+declare diffprg='diff'
+declare interactive
+
 usage() {
   LESS=-FEXR less <<'HELP'
 Usage: diffsed [OPTION]... <EXPR> <FILE>
@@ -12,45 +18,60 @@ OPTIONS:
 HELP
 }
 
+select_from() {
+  local o c cmd OPTARG OPTIND
+  cmd='command -v'
+  while getopts 'c:' o; do
+    case "$o" in
+      c) cmd="$OPTARG" ;;
+    esac
+  done
+  shift "$((OPTIND-1))"
+  for c; do
+    if $cmd "${c%% *}" &> /dev/null; then
+      echo "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
 ask() {
   read -r -N1 -p "$* " ans
   printf '\n'
   [[ ${ans^} == Y* ]]
 }
 
-declare sexpr
-declare file
-declare sedopts=()
-declare diffopts=( -u )
-declare diffprg='diff'
-declare i
-
 while true; do
   case "$1" in
-    -i) i=true          ; shift ;;
-    -r) sedopts+=( -r ) ; shift ;;
-    -h|--help) usage    ; exit  ;;
+    -i) interactive=true; shift ;;
+    -r) sedopts+=( -r );  shift ;;
+    -h|--help) usage;     exit  ;;
     *) break
   esac
 done
 
 sexpr="$1"
-file="$2"
+shift
+file=( "$@" )
 
-if command -v colordiff &> /dev/null; then
-  diffprg='colordiff'
-fi
+diffprg=$(select_from "delta -w $COLUMNS" diff-so-fancy diff-highlight colordiff 'diff -u' )
 
-patch=$($diffprg "${diffopts[@]}" "$file" <(sed "${sedopts[@]}" "$sexpr" "$file"))
+patch=''
+for f in "${file[@]}"; do
+  patch+=$($diffprg "$f" <(sed "${sedopts[@]}" "$sexpr" "$f"))
+done
 
-if [[ "$diffprg" == 'diff' ]] && [[ -t 0 || -p /dev/stdin ]]; then
-  # TODO: use ${parameter/pattern/string} + `tput` instead of sed
-  patch=$(sed 's/^-/\x1b[31m-/; s/^+/\x1b[32m+/; s/^@/\x1b[34m@/; s/$/\x1b[0m/' <<< "$patch")
-fi
 
-less <<< "$patch"
-
-if [[ -n "$i" ]]; then
-  ask 'save changes?' &&
-    sed "${sedopts[@]}" -i "$sexpr" "$file"
+if [[ ! -t 1 || ! -p /dev/stdout ]]; then
+  if [[ "$diffprg" == 'diff -u' ]]; then
+    # TODO: use ${parameter/pattern/string} + cached `tput` instead of sed
+    patch=$(sed 's/^-/\x1b[31m-/; s/^+/\x1b[32m+/; s/^@/\x1b[34m@/; s/$/\x1b[0m/' <<< "$patch")
+  fi
+  less -FEXR <<< "$patch"
+  if [[ -n "$interactive" ]]; then
+    ask 'save changes?' && sed "${sedopts[@]}" -i "$sexpr" "${file[@]}"
+  fi
+else
+  echo "$patch"
 fi

@@ -37,7 +37,7 @@ d_playlist() {
 
 i=2
 
-for arg do
+for arg; do
     if [[ $arg == :: ]]; then
         dmenu_args=( "${@:$i}" )
         break
@@ -48,7 +48,7 @@ for arg do
         -p) mode=playlist ;;
     esac
 
-    let i++
+    (( i++ ))
 done
 
 case "$mode" in

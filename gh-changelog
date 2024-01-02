@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+declare -a possible_paths
+declare repo="$1" # TODO: arg parsing
+declare actual_path
+declare response
+
+possible_paths=(
+  "CHANGELOG.md"
+  "HISTORY.md"
+  "RELEASE.md"
+  "RELEASE_NOTES.md"
+  "UPDATES.md"
+  "VERSION_HISTORY.md"
+  "RELEASE_HISTORY.md"
+  "CHANGE_HISTORY.md"
+  "HISTORY.md"
+  "CHANGELOG"
+  "CHANGES"
+  "HISTORY"
+  "CHANGELOG.org"
+  "HISTORY.txt"
+  "RELEASE_NOTES.txt"
+  "CHANGELOG.txt"
+  "CHANGELOG.yaml"
+  "CHANGELOG.json"
+  "RELEASE_NOTES.txt"
+  "RELEASE_NOTES.yaml"
+  "NEWS"
+)
+
+for file in "${possible_paths[@]}"; do
+  response=$(curl -sL --fail "https://github.com/${repo}/raw/master/$file")
+  if (( $? == 0 )); then
+    break
+  fi
+done
+
+if [[ -z $response ]]; then
+  echo "couldn't find changelog :("
+  exit
+fi
+
+bat -l markdown --plain <<< "$response"
