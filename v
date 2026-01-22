@@ -1,160 +1,154 @@
 #!/usr/bin/env bash
 
-declare -r esc=$'\033'
-declare -r c_reset="${esc}[0m"
-declare -r c_red="${esc}[31m"
-declare -r c_blue="${esc}[34m"
-declare noselect
-declare -a files
-declare -a vimopts
-
 usage() {
-  LESS=-FEXR less <<'HELP'
+    less -FEXR <<'EOF'
 v [OPTIONS] [FILES]
-create a new vim server or interact with an existing one
+tmux window-aware neovim server manager
 
-    -d       disable focusing on vim
-    + 'str'  return expr
-    : 'str'  send command
-    ! 'str'  send raw keys
-HELP
-}
+OPTIONS:
+  -h  --help  Show this help
+  -d          Disable focusing on vim pane
 
-in_term() {
-  [[ -t 0 || -p /dev/stdin ]]
-}
-
-info() {
-  if in_term; then
-    printf "${c_blue}%s${c_reset}\n" "$*" >&2
-  else
-    zenity --info --text="$*"
-  fi
-}
-
-err() {
-  if in_term; then
-    printf "${c_red}%s${c_reset}\n" "$*" >&2
-  else
-    zenity --error --text="$*"
-  fi
+BEHAVIOR:
+  - Each tmux window gets its own nvim server instance
+  - Running 'v' without files in existing nvim window shows file picker (fv)
+  - Different tmux windows maintain separate nvim instances
+  - Server names are serialized from tmux session+window info
+EOF
 }
 
 die() {
-  [[ -n "$1" ]] && err "$1"
-  exit 1
+    echo "Error: $*" >&2
+    exit 1
 }
 
 has() {
-  local verbose=false
-  if [[ $1 == '-v' ]]; then
-    verbose=true
+    command -v "$1" >/dev/null 2>&1
+}
+
+get_server_name() {
+    if [[ -z "${TMUX:-}" ]]; then
+        echo "/tmp/nvim-standalone"
+        return
+    fi
+
+    local session window
+    session=$(tmux display-message -p '#S')
+    window=$(tmux display-message -p '#I')
+
+    # Sanitize session name for filesystem
+    session=${session//[^a-zA-Z0-9_-]/_}
+
+    echo "/tmp/nvim-${session}-${window}"
+}
+
+server_exists() {
+    local server_name="$1"
+    [[ -S "$server_name" ]]
+}
+
+start_nvim_server() {
+    local server_name="$1"
     shift
-  fi
-  for c in "$@"; do c="${c%% *}"
-    if ! command -v "$c" &> /dev/null; then
-      [[ "$verbose" == true ]] && err "$c not found"
-      return 1
+
+    if [[ -n "${TMUX:-}" ]]; then
+        # Set window title to indicate nvim
+        tmux rename-window 'nvim' 2>/dev/null || true
     fi
-  done
+
+    # Start nvim with server listening
+    exec nvim --listen "$server_name" "$@"
 }
 
-vim() {
-  if has nvim nvr; then
-    NVIM_LISTEN_ADDRESS="/tmp/nvimsocket" nvr -l "$@"
-  else
-    command vim "$@"
-  fi
-}
+connect_to_server() {
+    local server_name="$1"
+    shift
 
-select_pane() {
-  serv="$1"
-  if [[ -n "$TMUX" && "$noselect" != true ]]; then
-    pane=$(vim --servername "$serv" --remote-expr '$TMUX_PANE')
-    if [[ -n "$pane" ]]; then
-      tmux select-pane   -t "$pane"
-      tmux select-window -t "$pane"
-    fi
-  fi
-}
-
-start_server() {
-  if in_term; then
-    if [[ "$noselect" != true && -n "$TMUX" ]]; then
-      tmux rename-window -t "$TMUX_PANE" 'vim'
-      if ! tmux list-sessions -F '#S' | grep -qF 'cmd'; then
-        if [[ -e "$HOME/.tmux.alt.conf" ]]; then
-          tmux_opts='source-file "$HOME/.tmux.alt.conf"'
-        else
-          tmux_opts="set prefix C-s \; bind s send-prefix \; bind C-s last-window \; unbind C-a \; set status-position top \; set status-justify centre \; set status-right '' \; set status-left ''"
+    if (($# == 0)); then
+        # No files specified - show file picker
+        if ! has fzf; then
+            die "fzf not found - cannot show file picker"
         fi
-        tmux split-window -t "$TMUX_PANE" -d -h "TMUX="" tmux new-session -s \"cmd\" \; $tmux_opts"
-      fi
-    fi &
-    if has nvim nvr; then
-      NVIM_LISTEN_ADDRESS=/tmp/nvimsocket exec nvim "$@"
+        exec fzf \
+            --preview='bat -fp {}' \
+            --preview-window=60% \
+            --bind='start:reload:fd --color=always' \
+            --bind="enter:execute:$0 {}"
     else
-      exec vim --servername 'VIMSERVER'  "$@"
+        # Open files in existing server
+        for file in "$@"; do
+            # Convert relative paths to absolute paths
+            if [[ "$file" = /* ]]; then
+                abs_file="$file"
+            else
+                abs_file="$PWD/$file"
+            fi
+            nvim --server "$server_name" --remote-send "<Esc>:e $abs_file<CR>"
+        done
     fi
-  else
-    has gvim || die 'cannot start new vim server'
-    exec gvim --servername 'VIMSERVER'  "$@"
-  fi
+
+    focus_nvim_pane "$server_name"
 }
 
-if ! has vim && ! has nvim; then
-  die 'vim or nevim not found!'
-fi
+focus_nvim_pane() {
+    local server_name="$1"
 
-while true; do
-  case "$1" in
-    -h|--help) usage; exit 0 ;;
-    -d) noselect=true; ;;
-    *) break ;;
-  esac
-  shift
-done
-
-if has nvim nvr; then
-    if [[ -e /tmp/nvimsocket ]]; then
-      serv=/tmp/nvimsocket
+    # Try to get the tmux pane from nvim
+    local pane
+    if pane=$(nvim --server "$server_name" --remote-expr 'v:servername' 2>/dev/null); then
+        tmux select-pane -t "$pane" 2>/dev/null || true
     else
-      serv=''
+        # Fallback: find pane running nvim
+        local nvim_pane
+        nvim_pane=$(tmux list-panes -F '#{pane_id} #{pane_current_command}' |
+            awk '$2 == "nvim" {print $1; exit}')
+        if [[ -n "$nvim_pane" ]]; then
+            tmux select-pane -t "$nvim_pane"
+        fi
     fi
-else
-  serv=$(vim --serverlist | grep -oP -m1 '^VIMSERVER$')
-fi
+}
 
-if [[ -n "$serv" ]]; then
-  vimopts=( '--servername' "$serv" )
-  if (( $# == 0 )); then
-    has fv || die 'enter a file name'
-    if in_term; then
-      fv -c "v ${noselect:+-d}"
-      exit 0
-    else
-      x-terminal-emulator -e fv -c v
-    fi
-  else
-    while (( $# > 0 )); do
-      case "$1" in
-        :*) vim "${vimopts[@]}" --remote-send "<esc>$1<cr>" ;;
-        !*) vim "${vimopts[@]}" --remote-send "${1:1}" ;;
-        +*) vim "${vimopts[@]}" --remote-expr "${1:1}" ;;
-        http://* | https://* ) vim "${vimopts[@]}" --remote-send "<esc>:enew | r !command curl -sL $1<cr><esc>ggdd:setfiletype " ;;
-        *) files+=("$1") ;;
-      esac
-      shift
+main() {
+    # Check dependencies
+    has nvim || die "neovim not found"
+
+    # Parse arguments
+    local files=()
+
+    while (($# > 0)); do
+        case "$1" in
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        -d)
+            export FOCUS_DISABLE=1
+            ;;
+        --)
+            shift
+            files+=("$@")
+            break
+            ;;
+        -*)
+            die "Unknown option: $1"
+            ;;
+        *)
+            files+=("$1")
+            ;;
+        esac
+        shift
     done
-  fi
-  select_pane "$serv" &
-  for f in "${files[@]}"; do
-    if [[ -d "$f" ]]; then
-      f=$(ag -l "$f")
+
+    local server_name
+    server_name=$(get_server_name)
+
+    if server_exists "$server_name"; then
+        # Server exists for this tmux window - connect to it
+        connect_to_server "$server_name" "${files[@]}"
+    else
+        # No server for this window - start new instance
+        start_nvim_server "$server_name" "${files[@]}"
     fi
-    vim "${vimopts[@]}" --remote "$f"
-    sleep 0.2
-  done &
-else
-  start_server "$@"
-fi
+}
+
+main "$@"
